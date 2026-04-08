@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Eye, EyeOff, Mail, Lock, User, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/lib/auth-context';
@@ -13,8 +13,9 @@ const Signup = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { signup } = useAuth();
-  const navigate = useNavigate();
+  const [signupComplete, setSignupComplete] = useState(false);
+  const [resending, setResending] = useState(false);
+  const { signup, resendVerification } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,14 +25,51 @@ const Signup = () => {
     setLoading(true);
     try {
       await signup(name, email, password);
-      toast.success('Account created successfully! You can now log in.');
-      navigate('/login');
+      setSignupComplete(true);
+      toast.success('Account created! Check your email for a verification link.');
     } catch (err: any) {
       toast.error(err?.message || 'Signup failed');
     } finally {
       setLoading(false);
     }
   };
+
+  const handleResend = async () => {
+    setResending(true);
+    try {
+      await resendVerification(email);
+      toast.success('Verification email resent! Check your inbox.');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to resend verification email');
+    } finally {
+      setResending(false);
+    }
+  };
+
+  if (signupComplete) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="w-full max-w-md">
+          <div className="rounded-2xl border border-border bg-card p-8 shadow-card text-center">
+            <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-6">
+              <Mail className="w-8 h-8 text-primary" />
+            </div>
+            <h2 className="text-xl font-bold text-foreground mb-2">Check your email</h2>
+            <p className="text-muted-foreground mb-6">
+              We sent a verification link to <strong className="text-foreground">{email}</strong>. Click the link to activate your account.
+            </p>
+            <Button onClick={handleResend} disabled={resending} variant="outline" className="w-full h-11 rounded-xl mb-3">
+              <RefreshCw className={`w-4 h-4 mr-2 ${resending ? 'animate-spin' : ''}`} />
+              {resending ? 'Resending...' : 'Resend verification email'}
+            </Button>
+            <p className="text-sm text-muted-foreground mt-4">
+              Already verified? <Link to="/login" className="text-primary font-medium hover:underline">Sign in</Link>
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">

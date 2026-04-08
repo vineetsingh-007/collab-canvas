@@ -23,7 +23,12 @@ const Login = () => {
       toast.success('Welcome back!');
       navigate('/dashboard');
     } catch (err: any) {
-      toast.error(err?.message || 'Invalid credentials');
+      const msg = err?.message || 'Invalid credentials';
+      if (msg.toLowerCase().includes('verify your email')) {
+        toast.error(msg, { duration: 6000 });
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setLoading(false);
     }
