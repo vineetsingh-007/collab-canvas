@@ -20,6 +20,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   updateProfile: (data: { name?: string }) => Promise<void>;
   updatePassword: (newPassword: string) => Promise<void>;
+  resendVerification: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -61,17 +62,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [fetchProfile]);
 
   const login = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
+    // Block login if email is not confirmed
+    if (data.user && !data.user.email_confirmed_at) {
+      await supabase.auth.signOut();
+      throw new Error('Please verify your email before logging in. Check your inbox for a confirmation link.');
+    }
   }, []);
 
   const signup = useCallback(async (name: string, email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { name }, emailRedirectTo: window.location.origin },
     });
     if (error) throw error;
+    // Check if user already exists (identities array empty = existing user)
+    if (data.user && data.user.identities && data.user.identities.length === 0) {
+      throw new Error('An account with this email already exists. Please log in instead.');
+    }
   }, []);
 
   const logout = useCallback(async () => {
@@ -90,8 +100,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (error) throw error;
   }, []);
 
+  const resendVerification = useCallback(async (email: string) => {
+    const { error } = await supabase.auth.resend({ type: 'signup', email });
+    if (error) throw error;
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, profile, session, isAuthenticated: !!session, loading, login, signup, logout, updateProfile, updatePassword }}>
+    <AuthContext.Provider value={{ user, profile, session, isAuthenticated: !!session, loading, login, signup, logout, updateProfile, updatePassword, resendVerification }}>
       {children}
     </AuthContext.Provider>
   );
