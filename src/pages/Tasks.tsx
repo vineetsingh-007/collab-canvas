@@ -25,10 +25,10 @@ interface Task {
 interface Project { id: string; name: string; }
 interface Profile { user_id: string; name: string; }
 
-const statusColors: Record<string, string> = {
-  'todo': 'bg-muted-foreground/20 text-muted-foreground',
-  'in-progress': 'bg-accent/10 text-accent',
-  'done': 'bg-primary/10 text-primary',
+const statusConfig: Record<string, { label: string; bg: string; dot: string }> = {
+  'todo': { label: 'To Do', bg: 'bg-muted text-muted-foreground', dot: 'bg-muted-foreground' },
+  'in-progress': { label: 'In Progress', bg: 'bg-accent/10 text-accent', dot: 'bg-accent' },
+  'done': { label: 'Done', bg: 'bg-primary/10 text-primary', dot: 'bg-primary' },
 };
 
 const Tasks = () => {
@@ -43,7 +43,6 @@ const Tasks = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [filter, setFilter] = useState<string>('all');
 
-  // Form state
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [projectId, setProjectId] = useState('');
@@ -64,20 +63,14 @@ const Tasks = () => {
 
   useEffect(() => {
     fetchData();
-
     const channel = supabase
       .channel('tasks-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
-        fetchData();
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => fetchData())
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  useEffect(() => {
-    if (projectFilter) setProjectId(projectFilter);
-  }, [projectFilter]);
+  useEffect(() => { if (projectFilter) setProjectId(projectFilter); }, [projectFilter]);
 
   const filteredTasks = tasks.filter(t => {
     if (projectFilter && t.project_id !== projectFilter) return false;
@@ -85,14 +78,8 @@ const Tasks = () => {
     return true;
   });
 
-  const getProfileName = (userId: string | null) => {
-    if (!userId) return 'Unassigned';
-    return profiles.find(p => p.user_id === userId)?.name || 'Unknown';
-  };
-
-  const getProjectName = (projectId: string) => {
-    return projects.find(p => p.id === projectId)?.name || 'Unknown';
-  };
+  const getProfileName = (userId: string | null) => !userId ? 'Unassigned' : profiles.find(p => p.user_id === userId)?.name || 'Unknown';
+  const getProjectName = (pid: string) => projects.find(p => p.id === pid)?.name || 'Unknown';
 
   const openCreate = () => {
     setTitle(''); setDescription(''); setAssignedTo(''); setDueDate('');
@@ -109,16 +96,9 @@ const Tasks = () => {
       created_by: user!.id,
     });
     if (error) { toast.error(error.message); return; }
-
-    // Send notification if assigned
     if (assignedTo && assignedTo !== user!.id) {
-      await supabase.from('notifications').insert({
-        user_id: assignedTo,
-        message: `You were assigned to task "${title}"`,
-        type: 'assignment',
-      });
+      await supabase.from('notifications').insert({ user_id: assignedTo, message: `You were assigned to task "${title}"`, type: 'assignment' });
     }
-
     toast.success('Task created');
     setDialogOpen(false);
     fetchData();
@@ -127,15 +107,9 @@ const Tasks = () => {
   const updateStatus = async (taskId: string, newStatus: string, taskTitle: string) => {
     const { error } = await supabase.from('tasks').update({ status: newStatus }).eq('id', taskId);
     if (error) { toast.error(error.message); return; }
-
-    // Notify about status change
     const task = tasks.find(t => t.id === taskId);
     if (task?.assigned_to && task.assigned_to !== user!.id) {
-      await supabase.from('notifications').insert({
-        user_id: task.assigned_to,
-        message: `Task "${taskTitle}" status changed to ${newStatus}`,
-        type: 'status',
-      });
+      await supabase.from('notifications').insert({ user_id: task.assigned_to, message: `Task "${taskTitle}" status changed to ${newStatus}`, type: 'status' });
     }
   };
 
@@ -150,108 +124,118 @@ const Tasks = () => {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-6 animate-fade-in">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
-            <h1 className="text-2xl font-bold">Tasks {currentProjectName ? `— ${currentProjectName}` : ''}</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Tasks {currentProjectName ? `— ${currentProjectName}` : ''}</h1>
             <p className="text-muted-foreground">Manage tasks{currentProjectName ? ` in ${currentProjectName}` : ' across all projects'}</p>
           </div>
-          <Button onClick={openCreate} className="bg-primary text-primary-foreground rounded-lg">
-            <Plus className="w-4 h-4 mr-1" /> New Task
+          <Button onClick={openCreate} className="rounded-xl gradient-primary text-primary-foreground font-semibold shadow-soft hover:shadow-glow transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] h-11 px-5">
+            <Plus className="w-4 h-4 mr-1.5" /> New Task
           </Button>
         </div>
 
+        {/* Filters */}
         <div className="flex gap-2 flex-wrap">
           {['all', 'todo', 'in-progress', 'done'].map(s => (
             <button key={s} onClick={() => setFilter(s)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${filter === s ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}>
+              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
+                filter === s
+                  ? 'gradient-primary text-primary-foreground shadow-soft'
+                  : 'bg-card border border-border/50 text-muted-foreground hover:text-foreground hover:border-primary/30'
+              }`}>
               {s === 'all' ? 'All' : s === 'in-progress' ? 'In Progress' : s.charAt(0).toUpperCase() + s.slice(1)}
             </button>
           ))}
         </div>
 
         {loading ? (
-          <p className="text-muted-foreground">Loading...</p>
+          <div className="space-y-3">
+            {[1,2,3].map(i => <div key={i} className="h-20 rounded-2xl bg-card border border-border/50 animate-pulse" />)}
+          </div>
         ) : filteredTasks.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">
-            <p>No tasks found.</p>
+          <div className="rounded-2xl border border-dashed border-border p-16 text-center">
+            <p className="text-muted-foreground text-lg font-medium">No tasks found</p>
+            <p className="text-muted-foreground text-sm mt-1">Create a new task to get started.</p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {filteredTasks.map(t => (
-              <div key={t.id} className="flex items-center gap-4 p-4 rounded-xl border border-border bg-card">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <h4 className={`font-medium text-sm ${t.status === 'done' ? 'line-through text-muted-foreground' : ''}`}>{t.title}</h4>
-                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusColors[t.status] || ''}`}>{t.status}</span>
+          <div className="space-y-3">
+            {filteredTasks.map(t => {
+              const cfg = statusConfig[t.status] || statusConfig['todo'];
+              return (
+                <div key={t.id} className="flex items-center gap-4 p-4 rounded-2xl border border-border/50 bg-card shadow-card hover:shadow-card-hover transition-all duration-200">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <h4 className={`font-medium text-sm ${t.status === 'done' ? 'line-through text-muted-foreground' : ''}`}>{t.title}</h4>
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${cfg.bg}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+                        {cfg.label}
+                      </span>
+                    </div>
+                    {t.description && <p className="text-xs text-muted-foreground truncate">{t.description}</p>}
+                    <div className="flex gap-3 mt-1.5 text-xs text-muted-foreground">
+                      <span className="bg-muted/50 px-2 py-0.5 rounded-md">{getProjectName(t.project_id)}</span>
+                      <span>→ {getProfileName(t.assigned_to)}</span>
+                      {t.due_date && <span>Due: {t.due_date}</span>}
+                    </div>
                   </div>
-                  <p className="text-xs text-muted-foreground truncate">{t.description}</p>
-                  <div className="flex gap-3 mt-1 text-xs text-muted-foreground">
-                    <span>{getProjectName(t.project_id)}</span>
-                    <span>→ {getProfileName(t.assigned_to)}</span>
-                    {t.due_date && <span>Due: {t.due_date}</span>}
-                  </div>
+
+                  <Select value={t.status} onValueChange={(v) => updateStatus(t.id, v, t.title)}>
+                    <SelectTrigger className="w-36 h-9 text-xs rounded-xl border-border/50">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todo">To Do</SelectItem>
+                      <SelectItem value="in-progress">In Progress</SelectItem>
+                      <SelectItem value="done">Done</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {t.created_by === user?.id && (
+                    <Button variant="ghost" size="icon" className="w-9 h-9 rounded-xl text-destructive hover:bg-destructive/10" onClick={() => deleteTask(t.id)}>
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
-
-                <Select value={t.status} onValueChange={(v) => updateStatus(t.id, v, t.title)}>
-                  <SelectTrigger className="w-32 h-8 text-xs rounded-lg">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todo">To Do</SelectItem>
-                    <SelectItem value="in-progress">In Progress</SelectItem>
-                    <SelectItem value="done">Done</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                {t.created_by === user?.id && (
-                  <Button variant="ghost" size="icon" className="w-8 h-8 text-destructive" onClick={() => deleteTask(t.id)}>
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent>
+          <DialogContent className="rounded-2xl">
             <DialogHeader><DialogTitle>New Task</DialogTitle></DialogHeader>
             <div className="space-y-4">
               <div>
                 <label className="text-sm font-medium mb-1.5 block">Title</label>
-                <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Task title" className="rounded-lg" />
+                <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Task title" className="rounded-xl h-11 bg-muted/50 border-border/50" />
               </div>
               <div>
                 <label className="text-sm font-medium mb-1.5 block">Description</label>
-                <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Description" className="rounded-lg" rows={2} />
+                <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Description" className="rounded-xl bg-muted/50 border-border/50" rows={2} />
               </div>
               <div>
                 <label className="text-sm font-medium mb-1.5 block">Project</label>
                 <Select value={projectId} onValueChange={setProjectId}>
-                  <SelectTrigger className="rounded-lg"><SelectValue placeholder="Select project" /></SelectTrigger>
-                  <SelectContent>
-                    {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                  </SelectContent>
+                  <SelectTrigger className="rounded-xl h-11 bg-muted/50 border-border/50"><SelectValue placeholder="Select project" /></SelectTrigger>
+                  <SelectContent>{projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div>
                 <label className="text-sm font-medium mb-1.5 block">Assign To</label>
                 <Select value={assignedTo} onValueChange={setAssignedTo}>
-                  <SelectTrigger className="rounded-lg"><SelectValue placeholder="Select user" /></SelectTrigger>
-                  <SelectContent>
-                    {profiles.map(p => <SelectItem key={p.user_id} value={p.user_id}>{p.name}</SelectItem>)}
-                  </SelectContent>
+                  <SelectTrigger className="rounded-xl h-11 bg-muted/50 border-border/50"><SelectValue placeholder="Select user" /></SelectTrigger>
+                  <SelectContent>{profiles.map(p => <SelectItem key={p.user_id} value={p.user_id}>{p.name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div>
                 <label className="text-sm font-medium mb-1.5 block">Due Date</label>
-                <Input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="rounded-lg" />
+                <Input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="rounded-xl h-11 bg-muted/50 border-border/50" />
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleCreate} className="bg-primary text-primary-foreground">Create</Button>
+              <Button variant="outline" onClick={() => setDialogOpen(false)} className="rounded-xl">Cancel</Button>
+              <Button onClick={handleCreate} className="rounded-xl gradient-primary text-primary-foreground">Create</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

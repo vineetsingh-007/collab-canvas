@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -64,64 +64,83 @@ const Projects = () => {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-6 animate-fade-in">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Projects</h1>
-            <p className="text-muted-foreground">Manage your projects</p>
+            <h1 className="text-2xl font-bold tracking-tight">Projects</h1>
+            <p className="text-muted-foreground">Manage your team's projects</p>
           </div>
-          <Button onClick={openCreate} className="bg-primary text-primary-foreground rounded-lg">
-            <Plus className="w-4 h-4 mr-1" /> New Project
+          <Button onClick={openCreate} className="rounded-xl gradient-primary text-primary-foreground font-semibold shadow-soft hover:shadow-glow transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] h-11 px-5">
+            <Plus className="w-4 h-4 mr-1.5" /> New Project
           </Button>
         </div>
 
         {loading ? (
-          <p className="text-muted-foreground">Loading...</p>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1,2,3].map(i => (
+              <div key={i} className="p-5 rounded-2xl border border-border/50 bg-card h-40 animate-pulse" />
+            ))}
+          </div>
         ) : projects.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">
-            <p>No projects yet. Create your first project to get started.</p>
+          <div className="rounded-2xl border border-dashed border-border p-16 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+              <Plus className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <p className="text-muted-foreground text-lg font-medium">No projects yet</p>
+            <p className="text-muted-foreground text-sm mt-1">Create your first project to get started.</p>
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {projects.map(p => (
-              <div key={p.id} className="p-5 rounded-xl border border-border bg-card hover:shadow-sm transition-shadow cursor-pointer" onClick={() => navigate(`/tasks?project=${p.id}`)}>
-                <div className="flex items-start justify-between mb-2">
-                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+              <div
+                key={p.id}
+                className="group p-5 rounded-2xl border border-border/50 bg-card shadow-card hover:shadow-card-hover transition-all duration-300 cursor-pointer hover:-translate-y-1"
+                onClick={() => navigate(`/tasks?project=${p.id}`)}
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="w-11 h-11 rounded-xl gradient-primary flex items-center justify-center text-primary-foreground font-bold text-sm shadow-soft">
                     {p.name.charAt(0)}
                   </div>
                   {p.created_by === user?.id && (
-                    <div className="flex gap-1" onClick={e => e.stopPropagation()}>
-                      <Button variant="ghost" size="icon" className="w-8 h-8" onClick={() => openEdit(p)}><Pencil className="w-3.5 h-3.5" /></Button>
-                      <Button variant="ghost" size="icon" className="w-8 h-8 text-destructive" onClick={() => handleDelete(p.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+                      <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg hover:bg-muted" onClick={() => openEdit(p)}>
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg text-destructive hover:bg-destructive/10" onClick={() => handleDelete(p.id)}>
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
                     </div>
                   )}
                 </div>
-                <h3 className="font-semibold mb-1">{p.name}</h3>
+                <h3 className="font-semibold mb-1 group-hover:text-primary transition-colors">{p.name}</h3>
                 <p className="text-sm text-muted-foreground line-clamp-2">{p.description || 'No description'}</p>
-                <p className="text-xs text-muted-foreground mt-3">{new Date(p.created_at).toLocaleDateString()}</p>
+                <div className="flex items-center justify-between mt-4">
+                  <p className="text-xs text-muted-foreground">{new Date(p.created_at).toLocaleDateString()}</p>
+                  <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200" />
+                </div>
               </div>
             ))}
           </div>
         )}
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent>
+          <DialogContent className="rounded-2xl">
             <DialogHeader>
               <DialogTitle>{editing ? 'Edit Project' : 'New Project'}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div>
                 <label className="text-sm font-medium mb-1.5 block">Name</label>
-                <Input value={name} onChange={e => setName(e.target.value)} placeholder="Project name" className="rounded-lg" />
+                <Input value={name} onChange={e => setName(e.target.value)} placeholder="Project name" className="rounded-xl h-11 bg-muted/50 border-border/50" />
               </div>
               <div>
                 <label className="text-sm font-medium mb-1.5 block">Description</label>
-                <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Project description" className="rounded-lg" rows={3} />
+                <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Project description" className="rounded-xl bg-muted/50 border-border/50" rows={3} />
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleSave} className="bg-primary text-primary-foreground">{editing ? 'Update' : 'Create'}</Button>
+              <Button variant="outline" onClick={() => setDialogOpen(false)} className="rounded-xl">Cancel</Button>
+              <Button onClick={handleSave} className="rounded-xl gradient-primary text-primary-foreground">{editing ? 'Update' : 'Create'}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
